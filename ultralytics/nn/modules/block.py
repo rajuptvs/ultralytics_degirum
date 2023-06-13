@@ -173,6 +173,8 @@ class C2f(nn.Module):
         self.c = int(c2 * e)  # hidden channels
         self.cv1 = Conv(c1, 2 * self.c, 1, 1)
         self.cv2 = Conv((2 + n) * self.c, c2, 1)  # optional act=FReLU(c2)
+        self.cv1_1 = Conv(c1, self.c, 1, 1)
+        self.cv1_2 = Conv(c1, self.c, 1, 1)
         self.m = nn.ModuleList(Bottleneck(self.c, self.c, shortcut, g, k=((3, 3), (3, 3)), e=1.0) for _ in range(n))
 
     def forward(self, x):
@@ -186,7 +188,23 @@ class C2f(nn.Module):
         y = list(self.cv1(x).split((self.c, self.c), 1))
         y.extend(m(y[-1]) for m in self.m)
         return self.cv2(torch.cat(y, 1))
+    
+    def forward_hw_optimized(self, x):
+        
+        cv1_1, cv1_2 = {}, {}
+        state_dict = self.cv1.state_dict()
+        weight = state_dict["conv.weight"]
+        bias = state_dict["conv.bias"]
+        cv1_1["conv.weight"] = weight[:self.c, :, :, :]
+        cv1_2["conv.weight"] = weight[self.c:, :, :, :]
+        cv1_1["conv.bias"] = bias[:self.c]
+        cv1_2["conv.bias"] = bias[self.c:]
+        self.cv1_1.load_state_dict(cv1_1)
+        self.cv1_2.load_state_dict(cv1_2)
 
+        y = list((self.cv1_1(x), self.cv1_2(x)))
+        y.extend(m(y[-1]) for m in self.m)
+        return self.cv2(torch.cat(y, 1))
 
 class C3(nn.Module):
     """CSP Bottleneck with 3 convolutions."""
