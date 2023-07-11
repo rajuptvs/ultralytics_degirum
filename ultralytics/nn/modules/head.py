@@ -26,6 +26,7 @@ class Detect(nn.Module):
     shape = None
     anchors = torch.empty(0)  # init
     strides = torch.empty(0)  # init
+    exclude_postprocess_detect = False
 
     def __init__(self, nc=80, ch=()):  # detection layer
         super().__init__()
@@ -52,9 +53,12 @@ class Detect(nn.Module):
             self.shape = shape
 
         x_cat = torch.cat([xi.view(shape[0], self.no, -1) for xi in x], 2)
-        if self.export and self.format in ('saved_model', 'pb', 'tflite', 'edgetpu', 'tfjs'):  # avoid TF FlexSplitV ops
-            box = x_cat[:, :self.reg_max * 4]
-            cls = x_cat[:, self.reg_max * 4:]
+        if self.export: #and   # avoid TF FlexSplitV ops
+            if self.format in ('saved_model', 'pb', 'tflite', 'edgetpu', 'tfjs'):
+                box = x_cat[:, :self.reg_max * 4]
+                cls = x_cat[:, self.reg_max * 4:]
+            if self.exclude_postprocess_detect:    
+                return x_cat
         else:
             box, cls = x_cat.split((self.reg_max * 4, self.nc), 1)
         dbox = dist2bbox(self.dfl(box), self.anchors.unsqueeze(0), xywh=True, dim=1) * self.strides
