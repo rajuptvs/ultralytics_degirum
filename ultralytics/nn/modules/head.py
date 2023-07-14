@@ -27,6 +27,7 @@ class Detect(nn.Module):
     anchors = torch.empty(0)  # init
     strides = torch.empty(0)  # init
     exclude_postprocess_detect = False
+    separate_box_cls = True
 
     def __init__(self, nc=80, ch=()):  # detection layer
         super().__init__()
@@ -44,8 +45,21 @@ class Detect(nn.Module):
     def forward(self, x):
         """Concatenates and returns predicted bounding boxes and class probabilities."""
         shape = x[0].shape  # BCHW
-        for i in range(self.nl):
-            x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)
+
+        if self.separate_box_cls:
+            boxes = []
+            probs = []
+
+            for i in range(self.nl):
+                a = self.cv2[i](x[i])
+                b = self.cv3[i](x[i])
+                x[i] = torch.cat((a, b), 1)
+                boxes.append(a)
+                probs.append(b)
+        else:
+            for i in range(self.nl):
+                x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)
+
         if self.training:
             return x
         elif self.dynamic or self.shape != shape:
@@ -53,16 +67,22 @@ class Detect(nn.Module):
             self.shape = shape
 
         x_cat = torch.cat([xi.view(shape[0], self.no, -1) for xi in x], 2)
+        
         if self.export: #and   # avoid TF FlexSplitV ops
-            if self.format in ('saved_model', 'pb', 'tflite', 'edgetpu', 'tfjs'):
+            if self.format in ('saved_model', 'pb', 'tflite', 'edgetpu', 'tfjs') and not self.separate_box_cls:
                 box = x_cat[:, :self.reg_max * 4]
                 cls = x_cat[:, self.reg_max * 4:]
             if self.exclude_postprocess_detect:    
+                if self.separate_box_cls:
+                    box = torch.cat([box.view(shape[0], self.reg_max * 4, -1) for box in boxes], 2)
+                    cls = torch.cat([prob.view(shape[0], self.nc, -1) for prob in probs], 2)
+                    return (box, cls)
                 return x_cat
         else:
             box, cls = x_cat.split((self.reg_max * 4, self.nc), 1)
         dbox = dist2bbox(self.dfl(box), self.anchors.unsqueeze(0), xywh=True, dim=1) * self.strides
         y = torch.cat((dbox, cls.sigmoid()), 1)
+
         return y if self.export else (y, x)
 
     def bias_init(self):

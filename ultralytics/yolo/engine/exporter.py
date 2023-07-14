@@ -189,6 +189,7 @@ class Exporter:
                 m.export = True
                 m.format = self.args.format
                 m.exclude_postprocess_detect = self.args.exclude_postprocess_detect
+                m.separate_box_cls = self.args.separate_box_cls
             elif isinstance(m, C2f) and not any((saved_model, pb, edgetpu, tfjs)):
                 # EdgeTPU does not support FlexSplitV while split provides cleaner ONNX graph
                 m.forward = m.forward_hw_optimized # m.forward_split
@@ -305,6 +306,7 @@ class Exporter:
         f = str(self.file.with_suffix('.onnx'))
 
         output_names = ['output0', 'output1'] if isinstance(self.model, SegmentationModel) else ['output0']
+        output_names = ['bbox', 'cls'] if self.args.separate_box_cls else output_names
         dynamic = self.args.dynamic
         if dynamic:
             dynamic = {'images': {0: 'batch', 2: 'height', 3: 'width'}}  # shape(1,3,640,640)
