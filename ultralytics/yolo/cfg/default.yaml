@@ -79,6 +79,7 @@ workspace: 4  # TensorRT: workspace size (GB)
 nms: False  # CoreML: add NMS
 exclude_postprocess_detect: False #
 separate_box_cls: False
+export_hw_optimized: False
 # Hyperparameters ------------------------------------------------------------------------------------------------------
 lr0: 0.01  # initial learning rate (i.e. SGD=1E-2, Adam=1E-3)
 lrf: 0.01  # final learning rate (lr0 * lrf)
