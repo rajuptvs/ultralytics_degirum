@@ -57,9 +57,10 @@ from copy import deepcopy
 from pathlib import Path
 
 import torch
+import torch.nn as nn
 
 from ultralytics.nn.autobackend import check_class_names
-from ultralytics.nn.modules import C2f, Detect, Segment
+from ultralytics.nn.modules import C2f, Detect, Segment, Conv
 from ultralytics.nn.tasks import DetectionModel, SegmentationModel
 from ultralytics.yolo.cfg import get_cfg
 from ultralytics.yolo.utils import (DEFAULT_CFG, LINUX, LOGGER, MACOS, __version__, callbacks, colorstr,
@@ -156,6 +157,7 @@ class Exporter:
         jit, onnx, xml, engine, coreml, saved_model, pb, tflite, edgetpu, tfjs, paddle = flags  # export booleans
 
         # Load PyTorch model
+        Conv.default_act = eval(self.args.act) if hasattr(self.args, 'act') else nn.SiLU()
         self.device = select_device('cpu' if self.args.device is None else self.args.device)
         if self.args.half and onnx and self.device.type == 'cpu':
             LOGGER.warning('WARNING ⚠️ half=True only compatible with GPU export, i.e. use device=0')
@@ -177,6 +179,9 @@ class Exporter:
             file = Path(file.name)
 
         # Update model
+
+        print(f'{colorstr("act:")} nn.{Conv.default_act}')
+
         model = deepcopy(model).to(self.device)
         for p in model.parameters():
             p.requires_grad = False
@@ -189,7 +194,7 @@ class Exporter:
                 m.export = True
                 m.format = self.args.format
                 m.exclude_postprocess_detect = self.args.exclude_postprocess_detect
-                m.separate_box_cls = self.args.separate_box_cls
+                m.separate_6_outputs = self.args.separate_6_outputs
             elif self.args.export_hw_optimized and isinstance(m, C2f) and not any((saved_model, pb, edgetpu, tfjs)):
                 # EdgeTPU does not support FlexSplitV while split provides cleaner ONNX graph
                 m.forward = m.forward_hw_optimized # m.forward_split
@@ -306,7 +311,6 @@ class Exporter:
         f = str(self.file.with_suffix('.onnx'))
 
         output_names = ['output0', 'output1'] if isinstance(self.model, SegmentationModel) else ['output0']
-        output_names = ['bbox', 'cls'] if self.args.separate_box_cls else output_names
         dynamic = self.args.dynamic
         if dynamic:
             dynamic = {'images': {0: 'batch', 2: 'height', 3: 'width'}}  # shape(1,3,640,640)

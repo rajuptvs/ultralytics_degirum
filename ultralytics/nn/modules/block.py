@@ -199,8 +199,11 @@ class C2f(nn.Module):
         cv1_2["conv.weight"] = weight[self.c:, :, :, :]
         cv1_1["conv.bias"] = bias[:self.c]
         cv1_2["conv.bias"] = bias[self.c:]
-        self.cv1_1.load_state_dict(cv1_1)
-        self.cv1_2.load_state_dict(cv1_2)
+        if not hasattr(self, 'cv1_1'):
+            self.cv1_1 = Conv(self.cv1.conv.in_channels, self.c, 1, 1)
+            self.cv1_2 = Conv(self.cv1.conv.in_channels, self.c, 1, 1)
+        self.cv1_1.load_state_dict(cv1_1, strict=False)
+        self.cv1_2.load_state_dict(cv1_2, strict=False)
 
         y = list((self.cv1_1(x), self.cv1_2(x)))
         y.extend(m(y[-1]) for m in self.m)

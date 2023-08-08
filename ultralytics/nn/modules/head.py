@@ -27,7 +27,7 @@ class Detect(nn.Module):
     anchors = torch.empty(0)  # init
     strides = torch.empty(0)  # init
     exclude_postprocess_detect = False
-    separate_box_cls = True
+    separate_6_outputs = True
 
     def __init__(self, nc=80, ch=()):  # detection layer
         super().__init__()
@@ -45,16 +45,17 @@ class Detect(nn.Module):
     def forward(self, x):
         """Concatenates and returns predicted bounding boxes and class probabilities."""
         shape = x[0].shape  # BCHW
-
-        if self.separate_box_cls:
+       
+        if self.separate_6_outputs:
             boxes = []
             probs = []
 
             for i in range(self.nl):
                 a = self.cv2[i](x[i])
                 b = self.cv3[i](x[i])
-                x[i] = torch.cat((a, b), 1)
-                boxes.append(a)
+                x[i] = torch.cat((a, b), 1) # save concatenated results
+
+                boxes.append(a) # save unconcatenated results
                 probs.append(b)
         else:
             for i in range(self.nl):
@@ -68,15 +69,13 @@ class Detect(nn.Module):
 
         x_cat = torch.cat([xi.view(shape[0], self.no, -1) for xi in x], 2)
         
-        if self.export: #and   # avoid TF FlexSplitV ops
-            if self.format in ('saved_model', 'pb', 'tflite', 'edgetpu', 'tfjs') and not self.separate_box_cls:
+        if self.export: # avoid TF FlexSplitV ops
+            if self.format in ('saved_model', 'pb', 'tflite', 'edgetpu', 'tfjs') and not self.separate_6_outputs:
                 box = x_cat[:, :self.reg_max * 4]
                 cls = x_cat[:, self.reg_max * 4:]
+            if self.separate_6_outputs:
+                return [torch.permute(x, (0, 2, 3, 1)).reshape(x.shape[0], -1, x.shape[1]) for x in boxes + probs]
             if self.exclude_postprocess_detect:    
-                if self.separate_box_cls:
-                    box = torch.cat([box.view(shape[0], self.reg_max * 4, -1) for box in boxes], 2)
-                    cls = torch.cat([prob.view(shape[0], self.nc, -1) for prob in probs], 2)
-                    return (box, cls)
                 return x_cat
         else:
             box, cls = x_cat.split((self.reg_max * 4, self.nc), 1)
