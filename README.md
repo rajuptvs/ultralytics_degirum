@@ -1,3 +1,36 @@
+# ultralytics_degirum
+
+Our ultralytics_degirum fork contains implementations for exporting a YOLO model with 6 separate outputs, for improved performance in quantized models.
+
+## Export to ONNX
+Generates a [model_name].onnx file
+```python
+from ultralytics import YOLO
+model = YOLO('path/to/model.pt')
+model.export(format='onnx', 
+             act='nn.ReLU6()',  # act='nn.SiLU()' by default
+             simplify=True, 
+             export_hw_optimized=True, 
+             separate_6_outputs=True
+             )
+```
+
+## Export to TFLite / TensorFlow SavedModel
+Generates a [model_name]_saved_model folder, containing a [model_name]_float32.tflite
+```python
+from ultralytics import YOLO
+model = YOLO('path/to/model.pt')
+model.export(format='tflite', 
+             act='nn.ReLU6()',  # act='nn.SiLU()' by default
+             simplify=True, 
+             export_hw_optimized=True, 
+             separate_6_outputs=True
+             )
+```
+
+Note: the **act** parameter must match the activation function that the model was trained on, otherwise it may not propagate through the network properly.
+#
+
 <div align="center">
   <p>
     <a href="https://ultralytics.com/yolov8" target="_blank">
