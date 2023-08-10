@@ -29,6 +29,19 @@ model.export(format='tflite',
 ```
 
 Note: the **act** parameter must match the activation function that the model was trained on, otherwise it may not propagate through the network properly.
+
+## Quantize TFLite 
+Follow the steps outlined above to export your model as a TensorFlow SavedModel, then run [dg_quantize.py](dg_quantize.py) with the following arguments:
+```bash
+$ python dg_quantize.py path/to/saved_model path/to/calib_dataset
+```
+## Compile for EdgeTPU
+1. Follow the instructions above to get a quantized TFLite model
+2. Follow the instructions at https://coral.ai/docs/edgetpu/compiler/ to install the Edge TPU compiler
+3. Run the Edge TPU compiler:
+```bash
+$ edgetpu_compiler path/to/quantized_model.tflite
+```
 #
 
 <div align="center">
