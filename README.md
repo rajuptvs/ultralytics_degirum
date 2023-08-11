@@ -42,6 +42,14 @@ $ python dg_quantize.py path/to/saved_model path/to/calib_dataset
 ```bash
 $ edgetpu_compiler path/to/quantized_model.tflite
 ```
+
+## Validating DG-Exported Models
+Float models exported in the above formats can be validated by running:
+```python
+from ultralytics import YOLO
+model = YOLO('path/to/onnx/or/tflite/model', task='detect')
+model.val(data='path/to/data.yaml')
+```
 #
 
 <div align="center">
